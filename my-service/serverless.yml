@@ -1,0 +1,18 @@
+service: my-service
+
+provider:
+  name: aws
+  runtime: nodejs8.10
+  menorySize: 64
+  stage: dev
+
+functions:
+  hello:
+    handler: handler.hello
+    events:
+      - http:
+          path: hello/get
+          method: get
+
+plugins:
+  - serverless-offline
