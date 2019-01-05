@@ -1,0 +1,102 @@
+service: serverless-chatroom-demo
+
+custom:
+  tableName: serverless-chatroom-demo-table-${self:provider.stage}
+
+provider:
+  name: aws
+  runtime: nodejs8.10
+  stage: dev
+  region: us-east-1
+  environment:
+    MESSAGES_TABLE: ${self:custom.tableName}
+    AWS_DEPLOY_REGION: ${self:provider.region}
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource:
+        - { "Fn::GetAtt": ["ChatMessagesDynamoDBTable", "Arn" ] }
+        - { "Fn::Join": [ "/", [
+           { "Fn::GetAtt": ["ChatMessagesDynamoDBTable", "Arn" ] }, "index", "roomIndex"
+          ]]}
+        - { "Fn::Join": [ "/", [
+            { "Fn::GetAtt": ["ChatMessagesDynamoDBTable", "Arn" ] }, "index", "userIndex"
+          ]]}
+
+functions:
+  createChatMessage:
+    handler: handler.createChatMessage
+    events:
+      - http:
+          method: post
+          path: /messages
+          private: false
+  getMessage:
+    handler: handler.getMessage
+    events:
+      - http:
+          method: get
+          path: /messages
+          private: false
+  getRoomMessages:
+    handler: handler.getRoomMessages
+    events:
+      - http:
+          method: get
+          path: /messages/room/{room}
+          private: false
+  getUserMessages:
+    handler: handler.getUserMessages
+    events:
+      - http:
+          method: get
+          path: /messages/user/{userId}
+          private: false
+
+plugins:
+  - serverless-offline
+
+resources:
+  Resources:
+    ChatMessagesDynamoDBTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: messageId
+            AttributeType: S
+          - AttributeName: room
+            AttributeType: S
+          - AttributeName: userId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: messageId
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: roomIndex
+            KeySchema:
+              - AttributeName: room
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+          - IndexName: userIndex
+            KeySchema:
+              - AttributeName: userId
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:custom.tableName}
